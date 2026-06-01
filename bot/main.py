@@ -1195,7 +1195,7 @@ async def greeting_message(bot: telegram.Bot) -> None:
         response = await klippy.check_connection()
         mess = ""
         if response:
-            mess += f"Bot online, no moonraker connection!\n {response} \nFailing..."
+            mess += f"Бот запущен, но нет подключения к moonraker!\n {response} \nОшибка..."
         else:
             mess += "Принтер в сети на " + get_local_ip()
             if configWrap.configuration_errors:

@@ -521,5 +521,5 @@ class ConfigWrapper:
         if self.parsing_errors:
             error_message += f"\n{self.parsing_errors}"
         if error_message:
-            error_message += 'Please correct the configuration according to the <a href="https://github.com/nlef/moonraker-telegram-bot/wiki">wiki</a>'
+            error_message += 'Пожалуйста, исправьте конфигурацию согласно <a href="https://github.com/nlef/moonraker-telegram-bot/wiki">wiki</a>'
         return error_message

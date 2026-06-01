@@ -245,7 +245,7 @@ class Notifier:
     # manual notification methods
     def send_error(self, message: str, logs_upload: bool = False) -> None:
         if logs_upload:
-            message += "\nUpload logs to analyzer /logs_upload\nSend logs to chat /logs"
+            message += "\nЗагрузить логи в анализатор /logs_upload\nОтправить логи в чат /logs"
         self._sched.add_job(
             self._send_message,
             kwargs={
@@ -338,7 +338,7 @@ class Notifier:
         if self._last_tgnotify_status and "tgnotify_status" in self._message_parts:
             mess += f"{escape_markdown(self._last_tgnotify_status, version=2)}\n"
         if "last_update_time" in self._message_parts:
-            mess += f"_Last update at {datetime.now():%H:%M:%S}_"
+            mess += f"_Последнее обновление в {datetime.now():%H:%M:%S}_"
 
         self._sched.add_job(
             self._notify,
