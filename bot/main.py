@@ -123,9 +123,42 @@ ws_helper: WebSocketHelper
 executors_pool: ThreadPoolExecutor = ThreadPoolExecutor(2, thread_name_prefix="bot_pool")
 
 
-async def echo_unknown(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.message is None:
+async def echo_unknown(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message is None or update.message.text is None:
         return
+    text = update.message.text.strip().lower()
+    
+    command_map = {
+        "status": status, "статус": status,
+        "help": help_command, "помощь": help_command,
+        "pause": pause_printing, "пауза": pause_printing,
+        "resume": resume_printing, "продолжить": resume_printing,
+        "cancel": cancel_printing, "отмена": cancel_printing,
+        "power": power_toggle, "питание": power_toggle,
+        "light": light_toggle, "свет": light_toggle,
+        "emergency": emergency_stop, "экстренная_остановка": emergency_stop,
+        "shutdown": shutdown_host, "выключение": shutdown_host,
+        "reboot": reboot_host, "перезагрузка": reboot_host,
+        "bot_restart": bot_restart, "перезапуск_бота": bot_restart,
+        "fw_restart": firmware_restart, "перезапуск_прошивки": firmware_restart,
+        "services": services_keyboard, "службы": services_keyboard,
+        "files": get_gcode_files, "файлы": get_gcode_files,
+        "macros": get_macros, "макросы": get_macros,
+        "logs": send_logs, "логи": send_logs,
+        "logs_upload": upload_logs, "загрузка_логов": upload_logs,
+        "ip": get_ip,
+        "video": get_video, "видео": get_video,
+    }
+    
+    if text in command_map:
+        await command_map[text](update, context)
+        return
+        
+    upper_text = update.message.text.replace("/", "").upper()
+    if upper_text in klippy.macros_all:
+        await macros_handler(update, context)
+        return
+        
     await update.message.reply_text(f"Неизвестная команда: {update.message.text}", quote=True)
 
 

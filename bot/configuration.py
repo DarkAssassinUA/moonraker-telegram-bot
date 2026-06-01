@@ -405,7 +405,7 @@ class TelegramUIConfig(ConfigHelper):
             map(
                 lambda el: list(
                     map(
-                        lambda iel: f"/{iel.strip()}",
+                        lambda iel: iel.strip(),
                         el.replace("[", "").replace("]", "").split(","),
                     )
                 ),
