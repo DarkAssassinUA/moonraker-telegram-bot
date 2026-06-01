@@ -1160,7 +1160,7 @@ async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if configWrap.telegram_ui.is_present_in_require_confirmation("help") or configWrap.telegram_ui.confirm_command():
-        await command_confirm_message(update, text="Show help?", callback_mess="help:")
+        await command_confirm_message(update, text="Показать помощь?", callback_mess="help:")
     else:
         await help_command_no_confirm(update.effective_message)
 
