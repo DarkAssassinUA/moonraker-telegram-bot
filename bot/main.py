@@ -1116,26 +1116,26 @@ def create_keyboard():
 
 def bot_commands() -> Dict[str, str]:
     commands = {
-        "help": "list bot commands",
-        "status": "send klipper status",
-        "ip": "send private ip of the bot installation",
-        "video": "record and upload a video",
-        "pause": "pause printing",
-        "resume": "resume printing",
-        "cancel": "cancel printing",
-        "power": "toggle moonraker power device from config",
-        "light": "toggle light",
-        "emergency": "emergency stop printing",
-        "shutdown": "shutdown bot host gracefully",
-        "reboot": "reboot bot host gracefully",
-        "bot_restart": "restarts the bot service, useful for config updates",
-        "fw_restart": "Execute klipper FIRMWARE_RESTART",
-        "services": "List services and restart them",
-        "files": "list available gcode files",
-        "macros": "list all visible macros from klipper",
-        "gcode": 'run any gcode command, spaces are supported. "gcode G28 Z"',
-        "logs": "get klipper, moonraker, bot logs",
-        "logs_upload": "upload logs to analyzer",
+        "help": "список команд бота",
+        "status": "показать статус Klipper",
+        "ip": "показать локальный IP-адрес",
+        "video": "записать и загрузить видео",
+        "pause": "приостановить печать",
+        "resume": "продолжить печать",
+        "cancel": "отменить печать",
+        "power": "переключить устройство питания",
+        "light": "переключить свет",
+        "emergency": "экстренная остановка печати",
+        "shutdown": "корректное выключение хоста",
+        "reboot": "перезагрузка хоста",
+        "bot_restart": "перезапуск бота",
+        "fw_restart": "перезапуск прошивки (FIRMWARE_RESTART)",
+        "services": "список служб и их перезапуск",
+        "files": "список доступных G-code файлов",
+        "macros": "список всех видимых макросов",
+        "gcode": 'выполнить G-code команду. "gcode G28 Z"',
+        "logs": "получить логи klipper, moonraker, бота",
+        "logs_upload": "загрузить логи в анализатор",
     }
     return {c: a for c, a in commands.items() if c not in configWrap.telegram_ui.hidden_bot_commands}
 
@@ -1145,7 +1145,7 @@ async def help_command_no_confirm(effective_message: Message) -> None:
     mess = (
         await klippy.get_versions_info(bot_only=True)
         + ("\n".join([f"/{c} - {a}" for c, a in bot_commands().items()]))
-        + '\n\nPlease refer to the <a href="https://github.com/nlef/moonraker-telegram-bot/wiki">wiki</a> for additional information'
+        + '\n\nПодробности в <a href="https://github.com/nlef/moonraker-telegram-bot/wiki">wiki</a>'
     )
     await effective_message.reply_text(
         text=mess,
@@ -1255,26 +1255,26 @@ def start_bot(bot_token, socks):
     application.add_handler(CallbackQueryHandler(button_lapse_handler, pattern="lapse:"))
     application.add_handler(CallbackQueryHandler(print_file_dialog_handler, pattern=re.compile("^\\S[^\\:]+\\.gcode$")))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(CommandHandler("help", help_command, block=False))
-    application.add_handler(CommandHandler("status", status, block=False))
-    application.add_handler(CommandHandler("ip", get_ip))
-    application.add_handler(CommandHandler("video", get_video))
-    application.add_handler(CommandHandler("pause", pause_printing))
-    application.add_handler(CommandHandler("resume", resume_printing))
-    application.add_handler(CommandHandler("cancel", cancel_printing))
-    application.add_handler(CommandHandler("power", power_toggle))
-    application.add_handler(CommandHandler("light", light_toggle))
-    application.add_handler(CommandHandler("emergency", emergency_stop))
-    application.add_handler(CommandHandler("shutdown", shutdown_host))
-    application.add_handler(CommandHandler("reboot", reboot_host))
-    application.add_handler(CommandHandler("bot_restart", bot_restart))
-    application.add_handler(CommandHandler("fw_restart", firmware_restart))
-    application.add_handler(CommandHandler("services", services_keyboard))
-    application.add_handler(CommandHandler("files", get_gcode_files, block=False))
-    application.add_handler(CommandHandler("macros", get_macros, block=False))
-    application.add_handler(CommandHandler("gcode", exec_gcode, block=False))
-    application.add_handler(CommandHandler("logs", send_logs, block=False))
-    application.add_handler(CommandHandler("logs_upload", upload_logs, block=False))
+    application.add_handler(CommandHandler(["help", "помощь"], help_command, block=False))
+    application.add_handler(CommandHandler(["status", "статус"], status, block=False))
+    application.add_handler(CommandHandler(["ip"], get_ip))
+    application.add_handler(CommandHandler(["video", "видео"], get_video))
+    application.add_handler(CommandHandler(["pause", "пауза"], pause_printing))
+    application.add_handler(CommandHandler(["resume", "продолжить"], resume_printing))
+    application.add_handler(CommandHandler(["cancel", "отмена"], cancel_printing))
+    application.add_handler(CommandHandler(["power", "питание"], power_toggle))
+    application.add_handler(CommandHandler(["light", "свет"], light_toggle))
+    application.add_handler(CommandHandler(["emergency", "экстренная_остановка"], emergency_stop))
+    application.add_handler(CommandHandler(["shutdown", "выключение"], shutdown_host))
+    application.add_handler(CommandHandler(["reboot", "перезагрузка"], reboot_host))
+    application.add_handler(CommandHandler(["bot_restart", "перезапуск_бота"], bot_restart))
+    application.add_handler(CommandHandler(["fw_restart", "перезапуск_прошивки"], firmware_restart))
+    application.add_handler(CommandHandler(["services", "службы"], services_keyboard))
+    application.add_handler(CommandHandler(["files", "файлы"], get_gcode_files, block=False))
+    application.add_handler(CommandHandler(["macros", "макросы"], get_macros, block=False))
+    application.add_handler(CommandHandler(["gcode"], exec_gcode, block=False))
+    application.add_handler(CommandHandler(["logs", "логи"], send_logs, block=False))
+    application.add_handler(CommandHandler(["logs_upload", "загрузка_логов"], upload_logs, block=False))
 
     application.add_handler(MessageHandler(filters.COMMAND, macros_handler, block=False))
 
