@@ -144,7 +144,7 @@ class Notifier:
                     await self._status_message.edit_text(text=message, parse_mode=ParseMode.MARKDOWN_V2)
 
                 if self._progress_update_message:
-                    mes = await self._bot.send_message(self._chat_id, text="Status has been updated\nThis message will be deleted", disable_notification=silent)
+                    mes = await self._bot.send_message(self._chat_id, text="Статус обновлен\nЭто сообщение будет удалено", disable_notification=silent)
                     self._bzz_mess_id = mes.message_id
             else:
                 sent_message = await self._bot.send_message(
@@ -194,7 +194,7 @@ class Notifier:
                     await self._status_message.edit_caption(caption=message, parse_mode=ParseMode.MARKDOWN_V2)
 
                     if self._progress_update_message:
-                        mes = await self._bot.send_message(self._chat_id, text="Status has been updated\nThis message will be deleted", disable_notification=silent)
+                        mes = await self._bot.send_message(self._chat_id, text="Статус обновлен\nЭто сообщение будет удалено", disable_notification=silent)
                         self._bzz_mess_id = mes.message_id
 
                 else:
@@ -462,7 +462,7 @@ class Notifier:
         # Todo: reset something? or check if reseted by setting new filename?
 
     async def _send_print_finish(self) -> None:
-        self._schedule_notification(message="Finished printing", finish=True)
+        self._schedule_notification(message="Печать завершена", finish=True)
 
     def send_print_finish(self) -> None:
         if self._enabled:
@@ -505,7 +505,7 @@ class Notifier:
             for path in paths:
                 path_obj = Path(path)
                 if not path_obj.is_file():
-                    await self._bot.send_message(self._chat_id, text="Provided path is not a file", disable_notification=self._silent_commands)
+                    await self._bot.send_message(self._chat_id, text="Указанный путь не является файлом", disable_notification=self._silent_commands)
                     return
 
                 bio = BytesIO()
@@ -515,7 +515,7 @@ class Notifier:
                     bio.write(fh.read())
                 bio.seek(0)
                 if bio.getbuffer().nbytes > 10485760:
-                    await self._bot.send_message(self._chat_id, text=f"Telegram bots have a 10mb filesize restriction for images, image couldn't be uploaded: `{path}`")
+                    await self._bot.send_message(self._chat_id, text=f"В Telegram ограничение 10МБ для изображений, не удалось загрузить: `{path}`")
                 else:
                     if not photos_list:
                         photos_list.append(InputMediaPhoto(bio, filename=bio.name, caption=message))
@@ -531,7 +531,7 @@ class Notifier:
 
         except Exception as ex:
             logger.warning(ex)
-            await self._bot.send_message(self._chat_id, text=f"Error sending image: {ex}", disable_notification=self._silent_commands)
+            await self._bot.send_message(self._chat_id, text=f"Ошибка отправки изображения: {ex}", disable_notification=self._silent_commands)
 
     def send_image(self, ws_message: str) -> None:
         self._sched.add_job(
@@ -549,7 +549,7 @@ class Notifier:
             for path in paths:
                 path_obj = Path(path)
                 if not path_obj.is_file():
-                    await self._bot.send_message(self._chat_id, text="Provided path is not a file", disable_notification=self._silent_commands)
+                    await self._bot.send_message(self._chat_id, text="Указанный путь не является файлом", disable_notification=self._silent_commands)
                     return
 
                 bio = BytesIO()
@@ -559,7 +559,7 @@ class Notifier:
                     bio.write(fh.read())
                 bio.seek(0)
                 if bio.getbuffer().nbytes > self._max_upload_file_size * 1024 * 1024:
-                    await self._bot.send_message(self._chat_id, text=f"Telegram bots have a {self._max_upload_file_size}mb filesize restriction, video couldn't be uploaded: `{path}`")
+                    await self._bot.send_message(self._chat_id, text=f"В Telegram ограничение {self._max_upload_file_size}МБ, не удалось загрузить видео: `{path}`")
                 else:
                     if not photos_list:
                         photos_list.append(InputMediaVideo(bio, filename=bio.name, caption=message))
@@ -576,7 +576,7 @@ class Notifier:
 
         except Exception as ex:
             logger.warning(ex)
-            await self._bot.send_message(self._chat_id, text=f"Error sending video: {ex}", disable_notification=self._silent_commands)
+            await self._bot.send_message(self._chat_id, text=f"Ошибка отправки видео: {ex}", disable_notification=self._silent_commands)
 
     def send_video(self, ws_message: str) -> None:
         self._sched.add_job(
@@ -594,7 +594,7 @@ class Notifier:
             for path in paths:
                 path_obj = Path(path)
                 if not path_obj.is_file():
-                    await self._bot.send_message(self._chat_id, text="Provided path is not a file", disable_notification=self._silent_commands)
+                    await self._bot.send_message(self._chat_id, text="Указанный путь не является файлом", disable_notification=self._silent_commands)
                     return
 
                 bio = BytesIO()
@@ -604,7 +604,7 @@ class Notifier:
                     bio.write(fh.read())
                 bio.seek(0)
                 if bio.getbuffer().nbytes > self._max_upload_file_size * 1024 * 1024:
-                    await self._bot.send_message(self._chat_id, text=f"Telegram bots have a {self._max_upload_file_size}mb filesize restriction, document couldn't be uploaded: `{path}`")
+                    await self._bot.send_message(self._chat_id, text=f"В Telegram ограничение {self._max_upload_file_size}МБ, не удалось загрузить документ: `{path}`")
                 else:
                     if not photos_list:
                         photos_list.append(InputMediaDocument(bio, filename=bio.name, caption=message))
@@ -620,7 +620,7 @@ class Notifier:
 
         except Exception as ex:
             logger.warning(ex)
-            await self._bot.send_message(self._chat_id, text=f"Error sending document: {ex}", disable_notification=self._silent_commands)
+            await self._bot.send_message(self._chat_id, text=f"Ошибка отправки документа: {ex}", disable_notification=self._silent_commands)
 
     def send_document(self, ws_message: str) -> None:
         self._sched.add_job(

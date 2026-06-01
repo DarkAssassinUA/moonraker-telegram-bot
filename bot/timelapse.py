@@ -250,10 +250,10 @@ class Timelapse:
             ) = await self._camera.create_timelapse(lapse_filename, lapse_filename if gcode_name_out is None else gcode_name_out, info_mess)
 
             if self._send_finished_lapse:
-                await info_mess.edit_text(text="Uploading time-lapse")
+                await info_mess.edit_text(text="Загрузка таймлапса")
 
                 if len(video_bytes) > self._max_upload_file_size * 1024 * 1024:
-                    await info_mess.edit_text(text=f"Telegram bots have a {self._max_upload_file_size}mb filesize restriction, please retrieve the timelapse from the configured folder\n{video_path}")
+                    await info_mess.edit_text(text=f"В Telegram ограничение размера файла {self._max_upload_file_size}МБ, пожалуйста, заберите таймлапс из настроенной папки\n{video_path}")
                 else:
                     lapse_caption = f"time-lapse of {gcode_name}"
                     if self._camera.lapse_missed_frames > 0:
@@ -274,7 +274,7 @@ class Timelapse:
                         logger.warning("Failed deleting message \n%s", badreq)
                     self._camera.cleanup(lapse_filename)
             else:
-                await info_mess.edit_text(text="Time-lapse creation finished")
+                await info_mess.edit_text(text="Создание таймлапса завершено")
 
             video_bio_nbytes = len(video_bytes)
 
@@ -290,7 +290,7 @@ class Timelapse:
                 await self._klippy.execute_gcode_script(self._after_lapse_gcode.strip())
         except Exception as ex:
             logger.warning("Failed to send time-lapse to telegram bot: %s", ex)
-            await info_mess.edit_text(text=f"Failed to send time-lapse to telegram bot: {str(ex)}")
+            await info_mess.edit_text(text=f"Не удалось отправить таймлапс в Telegram бота: {str(ex)}")
 
     async def _send_lapse(self) -> None:
         if not self._enabled or not self._klippy.printing_filename:
@@ -302,12 +302,12 @@ class Timelapse:
 
         info_mess: Message = await self._bot.send_message(
             chat_id=self._chat_id,
-            text=f"Starting time-lapse assembly for {gcode_name}",
+            text=f"Начинаю сборку таймлапса для {gcode_name}",
             disable_notification=self._silent_progress,
         )
 
         if self._executors_pool._work_queue.qsize() > 0:  # pylint: disable=protected-access
-            await info_mess.edit_text(text="Waiting for the completion of tasks for photographing")
+            await info_mess.edit_text(text="Ожидание завершения задач по фотографированию")
 
         await asyncio.sleep(5)
         while self._executors_pool._work_queue.qsize() > 0:  # pylint: disable=protected-access

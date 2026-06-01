@@ -278,7 +278,7 @@ class WebSocketHelper:
             self._klippy.printing = False
             self._timelapse.is_running = False
             self._notifier.remove_notifier_timer()
-            error_mess = f"Printer state change error: {print_stats_loc['state']}\n"
+            error_mess = f"Ошибка изменения состояния принтера: {print_stats_loc['state']}\n"
             if "message" in print_stats_loc and print_stats_loc["message"]:
                 error_mess += f"{print_stats_loc['message']}\n"
             self._notifier.send_error(error_mess, logs_upload=True)
@@ -289,14 +289,14 @@ class WebSocketHelper:
             self._timelapse.is_running = False
             # if not self._timelapse.manual_mode:
             # self._timelapse.send_timelapse()
-            self._notifier.send_printer_status_notification(f"Printer state change: {print_stats_loc['state']} \n")
+            self._notifier.send_printer_status_notification(f"Изменение состояния принтера: {print_stats_loc['state']} \n")
         elif state == "cancelled":
             self._klippy.paused = False
             self._klippy.printing = False
             self._timelapse.is_running = False
             self._notifier.remove_notifier_timer()
             self._timelapse.clean()
-            self._notifier.send_printer_status_notification("Print cancelled")
+            self._notifier.send_printer_status_notification("Печать отменена")
         elif state:
             logger.error("Unknown state: %s", state)
 
@@ -332,7 +332,7 @@ class WebSocketHelper:
                         if self._ws.state is State.OPEN:
                             await self._klippy.set_connected(True)
                             if self._klippy.state_message:
-                                self._notifier.send_error(f"Klippy changed state to {self._klippy.state}")
+                                self._notifier.send_error(f"Klippy изменил состояние на {self._klippy.state}")
                                 self._klippy.state_message = ""
                             await self.subscribe()
                             if self._scheduler.get_job("ws_reschedule"):
@@ -343,7 +343,7 @@ class WebSocketHelper:
                         state_message = message_result["state_message"]
                         if self._klippy.state_message != state_message and klippy_state != "startup":
                             self._klippy.state_message = state_message
-                            self._notifier.send_error(f"Klippy changed state to {self._klippy.state}\n{self._klippy.state_message}", logs_upload=True)
+                            self._notifier.send_error(f"Klippy изменил состояние на {self._klippy.state}\n{self._klippy.state_message}", logs_upload=True)
                     else:
                         logger.error("UnKnown klippy state: %s", klippy_state)
                         await self._klippy.set_connected(False)

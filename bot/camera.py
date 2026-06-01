@@ -512,7 +512,7 @@ class Camera:
 
         raw_frames.sort(key=os.path.getmtime)
 
-        asyncio.run_coroutine_threadsafe(info_mess.edit_text(text="Creating thumbnail"), loop).result()
+        asyncio.run_coroutine_threadsafe(info_mess.edit_text(text="Создание миниатюры"), loop).result()
         last_frame = raw_frames[-1]
         img = self._get_frame(last_frame)
 
@@ -537,16 +537,16 @@ class Camera:
                 fps=lapse_fps,
             )
 
-            asyncio.run_coroutine_threadsafe(info_mess.edit_text(text="Images recoding"), loop).result()
+            asyncio.run_coroutine_threadsafe(info_mess.edit_text(text="Перекодирование изображений"), loop).result()
             last_update_time = time.time()
             frames_skipped = 0
             frames_recorded = 0
             for fnum, filename in enumerate(raw_frames):
                 if time.time() >= last_update_time + 10:
                     if self._limit_fps:
-                        asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Images processed: {fnum}/{photo_count}, recorded: {frames_recorded}, skipped: {frames_skipped}"), loop).result()
+                        asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Обработано изображений: {fnum}/{photo_count}, записано: {frames_recorded}, пропущено: {frames_skipped}"), loop).result()
                     else:
-                        asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Images recoded {fnum}/{photo_count}"), loop).result()
+                        asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Перекодировано изображений {fnum}/{photo_count}"), loop).result()
                     last_update_time = time.time()
 
                 if not self._limit_fps or fnum % odd_frames == 0:
@@ -556,12 +556,12 @@ class Camera:
                     frames_skipped += 1
 
             if self._last_frame_duration > 0:
-                asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Repeating last image for {self._last_frame_duration} seconds"), loop).result()
+                asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Повтор последнего изображения на {self._last_frame_duration} сек."), loop).result()
                 for _ in range(lapse_fps * self._last_frame_duration):
                     out.write(img)
 
             if self._limit_fps:
-                asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Images recorded: {frames_recorded}, skipped: {frames_skipped}"), loop).result()
+                asyncio.run_coroutine_threadsafe(info_mess.edit_text(text=f"Записано изображений: {frames_recorded}, пропущено: {frames_skipped}"), loop).result()
 
             out.release()
             out = None
@@ -577,7 +577,7 @@ class Camera:
         with open(video_filepath, "rb") as fh:
             video_bytes = fh.read()
         if self._ready_dir and os.path.isdir(self._ready_dir):
-            asyncio.run_coroutine_threadsafe(info_mess.edit_text(text="Copy lapse to target ditectory"), loop).result()
+            asyncio.run_coroutine_threadsafe(info_mess.edit_text(text="Копирование таймлапса в целевую папку"), loop).result()
             target_video_file = f"{self._ready_dir}/{printing_filename}.mp4"
             Path(target_video_file).parent.mkdir(parents=True, exist_ok=True)
             with open(target_video_file, "wb") as cpf:
