@@ -1,6 +1,7 @@
 # moonraker-telegram-bot (Reworked Edition)
 
-![image](https://user-images.githubusercontent.com/51682059/140623765-3b839b4b-40c2-4f87-8969-6cb609f2c5f1.png)
+<img width="525" height="279" alt="image" src="https://github.com/user-attachments/assets/ad0d2a2a-72eb-4e7c-bb00-068ea8a0911f" />
+
 
 [English](#english) | [Русский](#русский)
 
