@@ -113,6 +113,10 @@ class Klippy:
         self._dbname: str = "telegram-bot"
 
         self._connected: bool = False
+        self.greeting_msg = None
+        self.menu_msg = None
+        self.menu_state = None
+        self.last_menu_text = ""
         self.printing: bool = False
         self.paused: bool = False
         self.state: str = ""

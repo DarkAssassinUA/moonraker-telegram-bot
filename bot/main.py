@@ -27,7 +27,7 @@ import emoji
 import httpx
 import orjson
 import telegram
-from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio, InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, MessageEntity, ReplyKeyboardMarkup, Update
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaAudio, InputMediaDocument, InputMediaPhoto, InputMediaVideo, Message, MessageEntity, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest
 from telegram.ext import Application, CallbackContext, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
@@ -240,9 +240,9 @@ async def get_ip(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         await get_ip_no_confirm(update.effective_message)
 
 
-async def get_video_no_confirm(effective_message: Message) -> None:
+async def get_video_no_confirm(effective_message: Message) -> Optional[Message]:
     if not cameraWrap.enabled:
-        await effective_message.reply_text("камера отключена", quote=True)
+        return await effective_message.reply_text("камера отключена", quote=True)
     else:
         info_reply: Message = await effective_message.reply_text(
             text="Начинаю запись видео",
@@ -255,10 +255,11 @@ async def get_video_no_confirm(effective_message: Message) -> None:
         (video_bio, thumb_bio, width, height) = await loop_loc.run_in_executor(executors_pool, cameraWrap.take_video)
         await info_reply.edit_text(text="Загружаю видео")
         max_upload_file_size: int = configWrap.bot_config.max_upload_file_size
+        ret_msg = None
         if video_bio.getbuffer().nbytes > max_upload_file_size * 1024 * 1024:
             await info_reply.edit_text(text=f"В Telegram ограничение на размер файла {max_upload_file_size}МБ...")
         else:
-            await effective_message.reply_video(
+            ret_msg = await effective_message.reply_video(
                 video=video_bio,
                 thumbnail=thumb_bio,
                 width=width,
@@ -272,6 +273,7 @@ async def get_video_no_confirm(effective_message: Message) -> None:
 
         video_bio.close()
         thumb_bio.close()
+        return ret_msg
 
 
 async def get_video(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -629,9 +631,7 @@ async def print_file_dialog_handler(update: Update, context: ContextTypes.DEFAUL
     if query.message.reply_markup is None:
         logger.error("Undefined query.message.reply_markup in %s", query.message.to_json())
         return
-    if update.effective_message.reply_to_message is None:
-        logger.error("Undefined reply_to_message for %s", update.effective_message.to_json())
-        return
+    target_msg = update.effective_message.reply_to_message if update.effective_message.reply_to_message else update.effective_message
     keyboard_keys = dict((x["callback_data"], x["text"]) for x in itertools.chain.from_iterable(query.message.reply_markup.to_dict()["inline_keyboard"]))
     pri_filename = keyboard_keys[query.data]
     keyboard = [
@@ -648,7 +648,7 @@ async def print_file_dialog_handler(update: Update, context: ContextTypes.DEFAUL
     ]
     start_pre_mess = "Начать печать файла:"
     message, bio = await klippy.get_file_info_by_name(pri_filename, f"{start_pre_mess}{pri_filename}?")
-    await update.effective_message.reply_to_message.reply_photo(
+    await target_msg.reply_photo(
         photo=bio,
         caption=message,
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -1201,15 +1201,15 @@ async def greeting_message(bot: telegram.Bot) -> None:
             if configWrap.configuration_errors:
                 mess += await klippy.get_versions_info(bot_only=True) + configWrap.configuration_errors
 
-        await bot.send_message(
+        klippy.greeting_msg = await bot.send_message(
             configWrap.secrets.chat_id,
             text=mess,
             parse_mode=ParseMode.HTML,
-            reply_markup=ReplyKeyboardMarkup(create_keyboard(), resize_keyboard=True),
+            reply_markup=ReplyKeyboardRemove(),
             disable_notification=notifier.silent_status,
         )
 
-    await bot.set_my_commands(commands=prepare_commands_list(await klippy.get_macros_force(), configWrap.telegram_ui.include_macros_in_command_list))
+    await bot.delete_my_commands()
     await klippy.add_bot_announcements_feed()
     await check_unfinished_lapses(bot)
 
@@ -1224,6 +1224,356 @@ def get_local_ip():
     finally:
         sock.close()
     return ip_address
+
+
+# --- Interactive Inline Menu Functions ---
+
+async def auto_update_menu(bot: telegram.Bot) -> None:
+    if not hasattr(klippy, "menu_msg") or not klippy.menu_msg:
+        return
+
+    try:
+        if klippy.menu_state == "main":
+            text = await get_main_menu_text()
+            if not hasattr(klippy, "last_menu_text") or klippy.last_menu_text != text:
+                await bot.edit_message_text(
+                    chat_id=configWrap.secrets.chat_id,
+                    message_id=klippy.menu_msg.message_id,
+                    text=text,
+                    reply_markup=get_main_menu_keyboard(),
+                    parse_mode=ParseMode.HTML,
+                )
+                klippy.last_menu_text = text
+
+        elif klippy.menu_state == "status":
+            mess = await klippy.get_status() if klippy.connected else "Не подключен к Klipper"
+            if not hasattr(klippy, "last_menu_text") or klippy.last_menu_text != mess:
+                keyboard = [[InlineKeyboardButton("🔄 Обновить", callback_data="menu:status"), InlineKeyboardButton("⬅️ Назад", callback_data="menu:main")]]
+                await bot.edit_message_text(
+                    chat_id=configWrap.secrets.chat_id,
+                    message_id=klippy.menu_msg.message_id,
+                    text=mess,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode=ParseMode.HTML,
+                )
+                klippy.last_menu_text = mess
+    except Exception as e:
+        if "Message to edit not found" in str(e) or "message is not modified" in str(e):
+            if "Message to edit not found" in str(e):
+                klippy.menu_msg = None
+                klippy.menu_state = None
+        else:
+            logger.error("Error in auto_update_menu: %s", e)
+
+
+def get_back_to_main_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu:main")]])
+
+
+async def get_main_menu_text() -> str:
+    status = "Не подключен к Klipper"
+    if klippy.connected:
+        status = "В сети (Ожидание)"
+        try:
+            resp = await klippy.make_request("GET", "/printer/objects/query?webhooks&print_stats")
+            if resp.is_success:
+                resp_json = orjson.loads(resp.text)
+                print_stats = resp_json["result"]["status"]["print_stats"]
+                state = print_stats["state"]
+                if state == "printing":
+                    status = "Печать"
+                elif state == "paused":
+                    status = "Пауза"
+                elif state == "cancelled":
+                    status = "Отменено"
+                elif state == "complete":
+                    status = "Завершено"
+                elif state == "standby":
+                    status = "Ожидание"
+                elif state == "error":
+                    status = "Ошибка"
+        except Exception as e:
+            logger.error("Error getting menu status text: %s", e)
+
+    local_ip = get_local_ip()
+    text = f"🏠 <b>Главное меню управления принтером</b>\n\n"
+    text += f"📍 <b>IP-адрес:</b> <code>{local_ip}</code>\n"
+    text += f"🚦 <b>Статус:</b> <code>{status}</code>\n"
+    return text
+
+
+def get_main_menu_keyboard() -> InlineKeyboardMarkup:
+    keyboard = []
+    # Row 1: Status & Camera
+    row1 = [InlineKeyboardButton("📊 Статус", callback_data="menu:status")]
+    if cameraWrap.enabled:
+        row1.append(InlineKeyboardButton("📸 Камера", callback_data="menu:camera"))
+    keyboard.append(row1)
+
+    # Row 2: Files & Macros
+    row2 = [InlineKeyboardButton("📂 G-code файлы", callback_data="menu:files_offset:0")]
+    if len(klippy.macros) > 0:
+        row2.append(InlineKeyboardButton("🤖 Макросы", callback_data="menu:macros_offset:0"))
+    keyboard.append(row2)
+
+    # Row 3: Power & Light Controls
+    row3 = []
+    if psu_power_device:
+        row3.append(InlineKeyboardButton("🔌 Питание", callback_data="menu:power"))
+    if light_power_device:
+        row3.append(InlineKeyboardButton("💡 Свет", callback_data="menu:light"))
+    if row3:
+        keyboard.append(row3)
+
+    # Row 4: Print Controls (Pause / Resume / Cancel)
+    row4 = [
+        InlineKeyboardButton("⏸️ Пауза", callback_data="menu:print_pause"),
+        InlineKeyboardButton("▶️ Продолжить", callback_data="menu:print_resume"),
+        InlineKeyboardButton("⏹️ Отмена", callback_data="menu:print_cancel"),
+    ]
+    keyboard.append(row4)
+
+    # Row 5: Services & System Controls
+    row5 = [InlineKeyboardButton("🛠️ Службы", callback_data="menu:services"), InlineKeyboardButton("⚙️ Система", callback_data="menu:system")]
+    keyboard.append(row5)
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_message is None or update.effective_message.get_bot() is None:
+        logger.warning("Undefined effective message or bot in menu_command")
+        return
+
+    await update.effective_message.get_bot().send_chat_action(chat_id=configWrap.secrets.chat_id, action=ChatAction.TYPING)
+    rm_msg = await update.effective_message.reply_text("Открываю меню...", reply_markup=ReplyKeyboardRemove())
+    await rm_msg.delete()
+    if klippy.greeting_msg:
+        try:
+            await context.bot.delete_message(chat_id=configWrap.secrets.chat_id, message_id=klippy.greeting_msg.message_id)
+        except Exception as e:
+            logger.debug("Failed to delete greeting message: %s", e)
+        klippy.greeting_msg = None
+    if hasattr(klippy, "temp_menu_messages"):
+        for msg in klippy.temp_menu_messages:
+            try:
+                await context.bot.delete_message(chat_id=configWrap.secrets.chat_id, message_id=msg.message_id)
+            except Exception as e:
+                logger.debug("Failed to delete temp menu message: %s", e)
+        klippy.temp_menu_messages.clear()
+    text = await get_main_menu_text()
+    klippy.menu_msg = await update.effective_message.reply_text(
+        text=text,
+        reply_markup=get_main_menu_keyboard(),
+        parse_mode=ParseMode.HTML,
+        disable_notification=notifier.silent_commands,
+        quote=True,
+    )
+    klippy.menu_state = "main"
+    klippy.last_menu_text = text
+
+
+async def get_menu_files_keyboard(offset: int = 0) -> InlineKeyboardMarkup:
+    gcodes = await klippy.get_gcode_files()
+    keyboard = []
+
+    # List up to 10 files
+    for element in gcodes[offset : offset + 10]:
+        filename = element["path"] if "path" in element else element["filename"]
+        file_hash = hashlib.md5(filename.encode()).hexdigest() + ".gcode"
+        keyboard.append([InlineKeyboardButton(filename, callback_data=file_hash)])
+
+    # Pagination
+    arrows = []
+    if offset >= 10:
+        arrows.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"menu:files_offset:{offset - 10}"))
+    arrows.append(InlineKeyboardButton("❌", callback_data="menu:main"))
+    if offset + 10 < len(gcodes):
+        arrows.append(InlineKeyboardButton("Вперед ➡️", callback_data=f"menu:files_offset:{offset + 10}"))
+    keyboard.append(arrows)
+
+    # Back to main menu
+    keyboard.append([InlineKeyboardButton("⬅️ Главное меню", callback_data="menu:main")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_menu_macros_keyboard(offset: int = 0) -> InlineKeyboardMarkup:
+    macros = klippy.macros
+    keyboard = []
+
+    # List up to 10 macros
+    for element in macros[offset : offset + 10]:
+        callback = f"macroc:{element}" if configWrap.telegram_ui.is_present_in_require_confirmation(element) or configWrap.telegram_ui.confirm_macro() else f"macro:{element}"
+        keyboard.append([InlineKeyboardButton(element, callback_data=callback)])
+
+    # Pagination
+    arrows = []
+    if offset >= 10:
+        arrows.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"menu:macros_offset:{offset - 10}"))
+    arrows.append(InlineKeyboardButton("❌", callback_data="menu:main"))
+    if offset + 10 < len(macros):
+        arrows.append(InlineKeyboardButton("Вперед ➡️", callback_data=f"menu:macros_offset:{offset + 10}"))
+    keyboard.append(arrows)
+
+    # Back to main menu
+    keyboard.append([InlineKeyboardButton("⬅️ Главное меню", callback_data="menu:main")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_menu_services_keyboard() -> InlineKeyboardMarkup:
+    services = configWrap.bot_config.services
+    keyboard = []
+    for element in services:
+        callback = f"rstrt_srvc:{element}" if configWrap.telegram_ui.is_present_in_require_confirmation("services") else f"rstrt_srv:{element}"
+        keyboard.append([InlineKeyboardButton(element, callback_data=callback)])
+
+    keyboard.append([InlineKeyboardButton("⬅️ Главное меню", callback_data="menu:main")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def menu_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_message is None or update.callback_query is None:
+        logger.warning("Undefined effective message or query in menu_callback_handler")
+        return
+
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    klippy.menu_msg = query.message
+    klippy.menu_state = "other"
+
+    if data == "menu:main":
+        if hasattr(klippy, "temp_menu_messages"):
+            for msg in klippy.temp_menu_messages:
+                try:
+                    await context.bot.delete_message(chat_id=configWrap.secrets.chat_id, message_id=msg.message_id)
+                except Exception as e:
+                    logger.debug("Failed to delete temp menu message: %s", e)
+            klippy.temp_menu_messages.clear()
+        text = await get_main_menu_text()
+        await query.edit_message_text(text=text, reply_markup=get_main_menu_keyboard(), parse_mode=ParseMode.HTML)
+        klippy.menu_state = "main"
+        klippy.last_menu_text = text
+
+    elif data == "menu:status":
+        mess = await klippy.get_status() if klippy.connected else "Не подключен к Klipper"
+        keyboard = [[InlineKeyboardButton("🔄 Обновить", callback_data="menu:status"), InlineKeyboardButton("⬅️ Назад", callback_data="menu:main")]]
+        await query.edit_message_text(text=mess, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+        klippy.menu_state = "status"
+        klippy.last_menu_text = mess
+
+    elif data == "menu:camera":
+        text = "📸 <b>Камера и видеозапись</b>\nВыберите действие:"
+        keyboard = [
+            [InlineKeyboardButton("📸 Сделать фото", callback_data="menu:take_photo"), InlineKeyboardButton("📹 Записать видео", callback_data="menu:take_video")],
+            [InlineKeyboardButton("⬅️ Назад", callback_data="menu:main")],
+        ]
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:take_photo":
+        await context.bot.send_chat_action(chat_id=configWrap.secrets.chat_id, action=ChatAction.UPLOAD_PHOTO)
+        loop_loc = asyncio.get_running_loop()
+        with await loop_loc.run_in_executor(executors_pool, cameraWrap.take_photo) as bio:
+            photo_msg = await context.bot.send_photo(chat_id=configWrap.secrets.chat_id, photo=bio, caption="📸 Фотография с камеры принтера", disable_notification=notifier.silent_commands)
+            bio.close()
+            if not hasattr(klippy, "temp_menu_messages"):
+                klippy.temp_menu_messages = []
+            if photo_msg:
+                klippy.temp_menu_messages.append(photo_msg)
+
+    elif data == "menu:take_video":
+        video_msg = await get_video_no_confirm(query.message)
+        if video_msg:
+            if not hasattr(klippy, "temp_menu_messages"):
+                klippy.temp_menu_messages = []
+            klippy.temp_menu_messages.append(video_msg)
+
+    elif data.startswith("menu:files_offset:"):
+        offset = int(data.split(":")[-1])
+        markup = await get_menu_files_keyboard(offset)
+        await query.edit_message_text(text="📂 <b>G-code файлы на принтере:</b>", reply_markup=markup, parse_mode=ParseMode.HTML)
+
+    elif data.startswith("menu:macros_offset:"):
+        offset = int(data.split(":")[-1])
+        markup = get_menu_macros_keyboard(offset)
+        await query.edit_message_text(text="🤖 <b>Доступные макросы:</b>", reply_markup=markup, parse_mode=ParseMode.HTML)
+
+    elif data == "menu:power":
+        text = "🔌 <b>Управление питанием принтера</b>"
+        keyboard = []
+        if psu_power_device:
+            keyboard.append([InlineKeyboardButton("🔌 Включить", callback_data="menu:power_on"), InlineKeyboardButton("🔌 Выключить", callback_data="menu:power_off")])
+        keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data="menu:main")])
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:power_on":
+        await psu_power_device.switch_device(True)
+        mess = f"Устройство `{psu_power_device.name}` включено" if not psu_power_device.device_error else f"Ошибка: {psu_power_device.device_error}"
+        await query.edit_message_text(text=f"🔌 {mess}", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:power_off":
+        await psu_power_device.switch_device(False)
+        mess = f"Устройство `{psu_power_device.name}` выключено" if not psu_power_device.device_error else f"Ошибка: {psu_power_device.device_error}"
+        await query.edit_message_text(text=f"🔌 {mess}", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:light":
+        text = "💡 <b>Управление освещением</b>"
+        keyboard = []
+        if light_power_device:
+            keyboard.append([InlineKeyboardButton("💡 Переключить свет", callback_data="menu:light_toggle")])
+        keyboard.append([InlineKeyboardButton("⬅️ Назад", callback_data="menu:main")])
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:light_toggle":
+        if light_power_device:
+            state = await light_power_device.toggle_device()
+            mess = f"Устройство `{light_power_device.name}` " + ("включено" if state else "выключено")
+            if light_power_device.device_error:
+                mess += "\nError: `" + light_power_device.device_error + "`"
+            await query.edit_message_text(text=f"💡 {mess}", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+        else:
+            await query.edit_message_text(text="💡 В конфиге не задано устройство освещения!", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:print_pause":
+        await ws_helper.manage_printing("pause")
+        await query.edit_message_text(text="⏸️ Печать приостанавливается...", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:print_resume":
+        await ws_helper.manage_printing("resume")
+        await query.edit_message_text(text="▶️ Печать возобновляется...", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:print_cancel":
+        await ws_helper.manage_printing("cancel")
+        await query.edit_message_text(text="⏹️ Печать отменяется...", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:services":
+        await query.edit_message_text(text="🛠️ <b>Управление службами:</b>", reply_markup=get_menu_services_keyboard(), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:system":
+        text = "⚙️ <b>Системные команды хоста Klipper:</b>"
+        keyboard = [
+            [InlineKeyboardButton("🤖 Рестарт прошивки", callback_data="menu:sys_fw_restart"), InlineKeyboardButton("🔄 Рестарт бота", callback_data="menu:sys_bot_restart")],
+            [InlineKeyboardButton("🌀 Перезагрузить хост", callback_data="menu:sys_reboot"), InlineKeyboardButton("⚠️ Выключить хост", callback_data="menu:sys_shutdown")],
+            [InlineKeyboardButton("⬅️ Назад", callback_data="menu:main")],
+        ]
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+
+    elif data == "menu:sys_fw_restart":
+        await query.edit_message_text(text="🤖 Перезапуск прошивки...", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+        await ws_helper.firmware_restart_printer()
+
+    elif data == "menu:sys_bot_restart":
+        await query.edit_message_text(text="🔄 Перезапуск бота...", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+        await restart_bot()
+
+    elif data == "menu:sys_reboot":
+        await query.edit_message_text(text="🌀 Перезагрузка хоста...", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+        await ws_helper.reboot_pi_host()
+
+    elif data == "menu:sys_shutdown":
+        await query.edit_message_text(text="⚠️ Выключение хоста...", reply_markup=get_back_to_main_keyboard(), parse_mode=ParseMode.HTML)
+        await ws_helper.shutdown_pi_host()
 
 
 def start_bot(bot_token, socks):
@@ -1254,8 +1604,10 @@ def start_bot(bot_token, socks):
 
     application.add_handler(CallbackQueryHandler(button_lapse_handler, pattern="lapse:"))
     application.add_handler(CallbackQueryHandler(print_file_dialog_handler, pattern=re.compile("^\\S[^\\:]+\\.gcode$")))
+    application.add_handler(CallbackQueryHandler(menu_callback_handler, pattern="^menu:"))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(CommandHandler("help", help_command, block=False))
+    application.add_handler(CommandHandler(["menu", "start"], menu_command, block=False))
     application.add_handler(CommandHandler("status", status, block=False))
     application.add_handler(CommandHandler(["ip"], get_ip))
     application.add_handler(CommandHandler("video", get_video))
@@ -1293,6 +1645,14 @@ async def start_scheduler(context: ContextTypes.DEFAULT_TYPE):
         greeting_message,
         # kwargs={"bot": bot_updater.bot},
         kwargs={"bot": context.bot},
+    )
+    a_scheduler.add_job(
+        auto_update_menu,
+        "interval",
+        seconds=10,
+        kwargs={"bot": context.bot},
+        id="menu_auto_update",
+        replace_existing=True,
     )
     # bot_updater.create_task(ws_helper.run_forever_async())
     loop = asyncio.get_event_loop()

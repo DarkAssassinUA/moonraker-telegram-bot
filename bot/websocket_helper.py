@@ -331,6 +331,15 @@ class WebSocketHelper:
                     if klippy_state == "ready":
                         if self._ws.state is State.OPEN:
                             await self._klippy.set_connected(True)
+                            if self._klippy.greeting_msg:
+                                try:
+                                    await self._notifier._bot.delete_message(
+                                        chat_id=self._notifier._chat_id,
+                                        message_id=self._klippy.greeting_msg.message_id
+                                    )
+                                except Exception as ex:
+                                    logger.error("Failed to delete greeting message: %s", ex)
+                                self._klippy.greeting_msg = None
                             if self._klippy.state_message:
                                 self._notifier.send_error(f"Klippy изменил состояние на {self._klippy.state}")
                                 self._klippy.state_message = ""
